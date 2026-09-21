@@ -1,0 +1,5 @@
+outs:
+- md5: 3808a9027db3dd888fd589254be12fe2
+  size: 1844
+  hash: md5
+  path: agriculture.csv
