@@ -3,9 +3,11 @@ name: Smart Agriculture CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   test:
@@ -36,4 +38,3 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest tests -v
-git ls-files app.py
