@@ -25,5 +25,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install fastapi "uvicorn[standard]" pandas scikit-learn joblib pytest httpx
 
+      - name: Check project files
+        run: |
+          pwd
+          ls -la
+          ls -la tests
+          ls -la models
+
       - name: Run automated tests
+        env:
+          PYTHONPATH: .
         run: python -m pytest tests -v
+git ls-files app.py
