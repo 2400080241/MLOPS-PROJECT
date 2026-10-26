@@ -1,284 +1,194 @@
+import os
+import joblib
 import pandas as pd
-import numpy as np
+
 import mlflow
 import mlflow.sklearn
 
 from sklearn.model_selection import train_test_split
-
-from sklearn.ensemble import (
-    RandomForestClassifier,
-    RandomForestRegressor
-)
-
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    classification_report,
-    mean_absolute_error,
-    mean_squared_error,
-    r2_score
-)
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
 
 
 # ============================================================
-# MLFLOW SETUP
+# 1. CONFIGURATION
 # ============================================================
 
-mlflow.set_tracking_uri("http://127.0.0.1:5000")
-mlflow.set_experiment("Smart Agriculture Prediction")
+DATA_PATH = "data/processed/agriculture_clean.csv"
+MODEL_DIR = "models"
+MODEL_PATH = os.path.join(MODEL_DIR, "crop_recommendation_model.pkl")
 
-
-# ============================================================
-# LOAD DATASET
-# ============================================================
-
-df = pd.read_csv("data/agriculture.csv")
-
-print("\n========================================")
-print("SMART AGRICULTURE ML SYSTEM")
-print("========================================")
-
-print("\nDataset shape:")
-print(df.shape)
-
-
-# ============================================================
-# DATA VALIDATION
-# ============================================================
-
-print("\n========================================")
-print("DATA VALIDATION")
-print("========================================")
-
-print("\nMissing values:")
-print(df.isnull().sum())
-
-print("\nTotal missing values:")
-print(df.isnull().sum().sum())
-
-print("\nDuplicate rows:")
-print(df.duplicated().sum())
-
-
-# ============================================================
-# REQUIRED COLUMNS
-# ============================================================
-
-required_columns = [
-    "temperature",
-    "humidity",
-    "soil_moisture",
-    "rainfall",
-    "soil_ph",
+FEATURES = [
     "nitrogen",
     "phosphorus",
     "potassium",
-    "crop_yield",
-    "soil_health",
-    "irrigation_required"
+    "temperature",
+    "humidity",
+    "soil_ph",
+    "rainfall",
+    "soil_moisture"
 ]
 
+TARGET = "label"
+
+MLFLOW_URI = "http://127.0.0.1:5000"
+EXPERIMENT_NAME = "Smart Agriculture Crop Recommendation"
+
+
+# ============================================================
+# 2. LOAD DATASET
+# ============================================================
+
+print("=" * 60)
+print("SMART AGRICULTURE - MODEL TRAINING")
+print("=" * 60)
+
+print("\nLoading dataset...")
+
+df = pd.read_csv(DATA_PATH)
+
+print("Dataset loaded successfully.")
+print("Dataset shape:", df.shape)
+
+
+# ============================================================
+# 3. VALIDATE DATASET
+# ============================================================
+
+print("\nChecking required columns...")
+
+required_columns = FEATURES + [TARGET]
+
 missing_columns = [
-    column
-    for column in required_columns
+    column for column in required_columns
     if column not in df.columns
 ]
 
 if missing_columns:
+    raise ValueError(
+        f"Missing required columns: {missing_columns}"
+    )
 
-    print("\nERROR: Missing columns:")
-    print(missing_columns)
+print("All required columns are present.")
+
+
+# Check missing values
+
+missing_values = df[required_columns].isnull().sum()
+
+if missing_values.sum() > 0:
+    print("\nMissing values detected:")
+    print(missing_values[missing_values > 0])
 
     raise ValueError(
-        "Dataset does not contain all required columns."
+        "Dataset contains missing values. "
+        "Please clean the dataset before training."
     )
 
-
-print("\nAll required columns are present.")
-
-
-# ============================================================
-# INPUT FEATURES
-# ============================================================
-
-features = [
-    "temperature",
-    "humidity",
-    "soil_moisture",
-    "rainfall",
-    "soil_ph",
-    "nitrogen",
-    "phosphorus",
-    "potassium"
-]
-
-X = df[features]
+print("No missing values found.")
 
 
 # ============================================================
-# GENERAL MODEL SETTINGS
+# 4. FEATURES AND TARGET
 # ============================================================
 
-N_ESTIMATORS = 100
-RANDOM_STATE = 42
-TEST_SIZE = 0.20
+X = df[FEATURES]
+y = df[TARGET]
 
-TRUSTED_TYPES = [
-    "sklearn.tree._tree.Tree"
-]
+print("\nFeatures:")
+print(FEATURES)
+
+print("\nTarget:")
+print(TARGET)
+
+print("\nNumber of crop classes:", y.nunique())
+
+print("\nCrop classes:")
+print(sorted(y.unique()))
 
 
 # ============================================================
-# MODEL 1: IRRIGATION
+# 5. TRAIN / TEST SPLIT
 # ============================================================
 
-print("\n")
-print("========================================")
-print("IRRIGATION PREDICTION")
-print("========================================")
+print("\nSplitting dataset...")
 
-
-y_irrigation = df["irrigation_required"]
-
-
-X_train_irrigation, X_test_irrigation, \
-y_train_irrigation, y_test_irrigation = train_test_split(
-
+X_train, X_test, y_train, y_test = train_test_split(
     X,
-    y_irrigation,
-
-    test_size=TEST_SIZE,
-
-    random_state=RANDOM_STATE,
-
-    stratify=y_irrigation
+    y,
+    test_size=0.20,
+    random_state=42,
+    stratify=y
 )
 
+print("Training samples:", len(X_train))
+print("Testing samples:", len(X_test))
 
-with mlflow.start_run(
-    run_name="Irrigation_Model"
-):
 
-    # --------------------------------------------------------
-    # CREATE MODEL
-    # --------------------------------------------------------
+# ============================================================
+# 6. CONNECT TO MLFLOW
+# ============================================================
 
-    irrigation_model = RandomForestClassifier(
+print("\nConnecting to MLflow...")
 
-        n_estimators=N_ESTIMATORS,
+mlflow.set_tracking_uri(MLFLOW_URI)
 
-        random_state=RANDOM_STATE
+mlflow.set_experiment(EXPERIMENT_NAME)
+
+
+# ============================================================
+# 7. TRAIN RANDOM FOREST MODEL
+# ============================================================
+
+print("\nStarting model training...")
+
+with mlflow.start_run() as run:
+
+    model = RandomForestClassifier(
+        n_estimators=200,
+        random_state=42,
+        n_jobs=-1
     )
 
+    model.fit(X_train, y_train)
 
-    # --------------------------------------------------------
-    # TRAIN MODEL
-    # --------------------------------------------------------
+    print("Model training completed.")
 
-    irrigation_model.fit(
 
-        X_train_irrigation,
+    # ========================================================
+    # 8. PREDICTIONS
+    # ========================================================
 
-        y_train_irrigation
+    predictions = model.predict(X_test)
+
+
+    # ========================================================
+    # 9. MODEL EVALUATION
+    # ========================================================
+
+    accuracy = accuracy_score(
+        y_test,
+        predictions
     )
 
+    print("\n" + "=" * 60)
+    print("MODEL EVALUATION")
+    print("=" * 60)
 
-    # --------------------------------------------------------
-    # PREDICTIONS
-    # --------------------------------------------------------
-
-    irrigation_prediction = irrigation_model.predict(
-
-        X_test_irrigation
-    )
-
-
-    # --------------------------------------------------------
-    # METRICS
-    # --------------------------------------------------------
-
-    irrigation_accuracy = accuracy_score(
-
-        y_test_irrigation,
-
-        irrigation_prediction
-    )
-
-
-    irrigation_precision = precision_score(
-
-        y_test_irrigation,
-
-        irrigation_prediction,
-
-        zero_division=0
-    )
-
-
-    irrigation_recall = recall_score(
-
-        y_test_irrigation,
-
-        irrigation_prediction,
-
-        zero_division=0
-    )
-
-
-    irrigation_f1 = f1_score(
-
-        y_test_irrigation,
-
-        irrigation_prediction,
-
-        zero_division=0
-    )
-
-
-    # --------------------------------------------------------
-    # PRINT RESULTS
-    # --------------------------------------------------------
-
-    print(
-        "Accuracy:",
-        round(irrigation_accuracy, 4)
-    )
-
-    print(
-        "Precision:",
-        round(irrigation_precision, 4)
-    )
-
-    print(
-        "Recall:",
-        round(irrigation_recall, 4)
-    )
-
-    print(
-        "F1 Score:",
-        round(irrigation_f1, 4)
-    )
-
+    print(f"\nAccuracy: {accuracy:.4f}")
 
     print("\nClassification Report:")
-
     print(
         classification_report(
-
-            y_test_irrigation,
-
-            irrigation_prediction,
-
-            zero_division=0
+            y_test,
+            predictions
         )
     )
 
 
-    # --------------------------------------------------------
-    # MLFLOW PARAMETERS
-    # --------------------------------------------------------
+    # ========================================================
+    # 10. LOG PARAMETERS TO MLFLOW
+    # ========================================================
 
     mlflow.log_param(
         "model_type",
@@ -287,664 +197,133 @@ with mlflow.start_run(
 
     mlflow.log_param(
         "n_estimators",
-        N_ESTIMATORS
+        200
     )
 
     mlflow.log_param(
         "random_state",
-        RANDOM_STATE
+        42
     )
 
     mlflow.log_param(
         "test_size",
-        TEST_SIZE
+        0.20
     )
 
     mlflow.log_param(
-        "dataset",
-        "data/agriculture.csv"
-    )
-
-    mlflow.log_param(
-        "dataset_rows",
-        len(df)
-    )
-
-    mlflow.log_param(
-        "dataset_columns",
-        len(df.columns)
+        "feature_count",
+        len(FEATURES)
     )
 
     mlflow.log_param(
         "features",
-        ",".join(features)
+        ",".join(FEATURES)
     )
 
 
-    # --------------------------------------------------------
-    # MLFLOW METRICS
-    # --------------------------------------------------------
+    # ========================================================
+    # 11. LOG METRICS TO MLFLOW
+    # ========================================================
 
     mlflow.log_metric(
         "accuracy",
-        irrigation_accuracy
-    )
-
-    mlflow.log_metric(
-        "precision",
-        irrigation_precision
-    )
-
-    mlflow.log_metric(
-        "recall",
-        irrigation_recall
-    )
-
-    mlflow.log_metric(
-        "f1_score",
-        irrigation_f1
+        accuracy
     )
 
 
-    # --------------------------------------------------------
-    # SAVE MODEL TO MLFLOW
-    # --------------------------------------------------------
+    # ========================================================
+    # 12. LOG MODEL TO MLFLOW
+    # ========================================================
+
+    print("\nLogging model to MLflow...")
 
     mlflow.sklearn.log_model(
-
-        irrigation_model,
-
-        name="irrigation_model",
-
-        skops_trusted_types=TRUSTED_TYPES
+        model,
+        name="crop_recommendation_model",
+        skops_trusted_types=[
+            "sklearn.tree._tree.Tree"
+        ]
     )
 
+    print("Model successfully logged to MLflow.")
+
+    print("\nMLflow Run ID:")
+    print(run.info.run_id)
+
 
 # ============================================================
-# MODEL 2: SOIL HEALTH
+# 13. SAVE MODEL LOCALLY
 # ============================================================
 
-print("\n")
-print("========================================")
-print("SOIL HEALTH PREDICTION")
-print("========================================")
+print("\nSaving model locally...")
 
-
-y_soil = df["soil_health"]
-
-
-X_train_soil, X_test_soil, \
-y_train_soil, y_test_soil = train_test_split(
-
-    X,
-    y_soil,
-
-    test_size=TEST_SIZE,
-
-    random_state=RANDOM_STATE,
-
-    stratify=y_soil
+os.makedirs(
+    MODEL_DIR,
+    exist_ok=True
 )
 
-
-with mlflow.start_run(
-    run_name="Soil_Health_Model"
-):
-
-    # --------------------------------------------------------
-    # CREATE MODEL
-    # --------------------------------------------------------
-
-    soil_model = RandomForestClassifier(
-
-        n_estimators=N_ESTIMATORS,
-
-        random_state=RANDOM_STATE
-    )
-
-
-    # --------------------------------------------------------
-    # TRAIN MODEL
-    # --------------------------------------------------------
-
-    soil_model.fit(
-
-        X_train_soil,
-
-        y_train_soil
-    )
-
-
-    # --------------------------------------------------------
-    # PREDICTIONS
-    # --------------------------------------------------------
-
-    soil_prediction = soil_model.predict(
-
-        X_test_soil
-    )
-
-
-    # --------------------------------------------------------
-    # METRICS
-    # --------------------------------------------------------
-
-    soil_accuracy = accuracy_score(
-
-        y_test_soil,
-
-        soil_prediction
-    )
-
-
-    soil_precision = precision_score(
-
-        y_test_soil,
-
-        soil_prediction,
-
-        average="weighted",
-
-        zero_division=0
-    )
-
-
-    soil_recall = recall_score(
-
-        y_test_soil,
-
-        soil_prediction,
-
-        average="weighted",
-
-        zero_division=0
-    )
-
-
-    soil_f1 = f1_score(
-
-        y_test_soil,
-
-        soil_prediction,
-
-        average="weighted",
-
-        zero_division=0
-    )
-
-
-    # --------------------------------------------------------
-    # PRINT RESULTS
-    # --------------------------------------------------------
-
-    print(
-        "Accuracy:",
-        round(soil_accuracy, 4)
-    )
-
-    print(
-        "Precision:",
-        round(soil_precision, 4)
-    )
-
-    print(
-        "Recall:",
-        round(soil_recall, 4)
-    )
-
-    print(
-        "F1 Score:",
-        round(soil_f1, 4)
-    )
-
-
-    print("\nClassification Report:")
-
-    print(
-        classification_report(
-
-            y_test_soil,
-
-            soil_prediction,
-
-            zero_division=0
-        )
-    )
-
-
-    # --------------------------------------------------------
-    # MLFLOW PARAMETERS
-    # --------------------------------------------------------
-
-    mlflow.log_param(
-        "model_type",
-        "RandomForestClassifier"
-    )
-
-    mlflow.log_param(
-        "n_estimators",
-        N_ESTIMATORS
-    )
-
-    mlflow.log_param(
-        "random_state",
-        RANDOM_STATE
-    )
-
-    mlflow.log_param(
-        "test_size",
-        TEST_SIZE
-    )
-
-    mlflow.log_param(
-        "dataset",
-        "data/agriculture.csv"
-    )
-
-    mlflow.log_param(
-        "dataset_rows",
-        len(df)
-    )
-
-    mlflow.log_param(
-        "dataset_columns",
-        len(df.columns)
-    )
-
-    mlflow.log_param(
-        "features",
-        ",".join(features)
-    )
-
-
-    # --------------------------------------------------------
-    # MLFLOW METRICS
-    # --------------------------------------------------------
-
-    mlflow.log_metric(
-        "accuracy",
-        soil_accuracy
-    )
-
-    mlflow.log_metric(
-        "precision",
-        soil_precision
-    )
-
-    mlflow.log_metric(
-        "recall",
-        soil_recall
-    )
-
-    mlflow.log_metric(
-        "f1_score",
-        soil_f1
-    )
-
-
-    # --------------------------------------------------------
-    # SAVE MODEL TO MLFLOW
-    # --------------------------------------------------------
-
-    mlflow.sklearn.log_model(
-
-        soil_model,
-
-        name="soil_health_model",
-
-        skops_trusted_types=TRUSTED_TYPES
-    )
-
-
-# ============================================================
-# MODEL 3: CROP YIELD
-# ============================================================
-
-print("\n")
-print("========================================")
-print("CROP YIELD PREDICTION")
-print("========================================")
-
-
-y_yield = df["crop_yield"]
-
-
-X_train_yield, X_test_yield, \
-y_train_yield, y_test_yield = train_test_split(
-
-    X,
-    y_yield,
-
-    test_size=TEST_SIZE,
-
-    random_state=RANDOM_STATE
+joblib.dump(
+    model,
+    MODEL_PATH
 )
 
-
-with mlflow.start_run(
-    run_name="Crop_Yield_Model"
-):
-
-    # --------------------------------------------------------
-    # CREATE MODEL
-    # --------------------------------------------------------
-
-    yield_model = RandomForestRegressor(
-
-        n_estimators=N_ESTIMATORS,
-
-        random_state=RANDOM_STATE
-    )
-
-
-    # --------------------------------------------------------
-    # TRAIN MODEL
-    # --------------------------------------------------------
-
-    yield_model.fit(
-
-        X_train_yield,
-
-        y_train_yield
-    )
-
-
-    # --------------------------------------------------------
-    # PREDICTIONS
-    # --------------------------------------------------------
-
-    yield_prediction = yield_model.predict(
-
-        X_test_yield
-    )
-
-
-    # --------------------------------------------------------
-    # METRICS
-    # --------------------------------------------------------
-
-    mae = mean_absolute_error(
-
-        y_test_yield,
-
-        yield_prediction
-    )
-
-
-    rmse = np.sqrt(
-
-        mean_squared_error(
-
-            y_test_yield,
-
-            yield_prediction
-        )
-    )
-
-
-    r2 = r2_score(
-
-        y_test_yield,
-
-        yield_prediction
-    )
-
-
-    # --------------------------------------------------------
-    # PRINT RESULTS
-    # --------------------------------------------------------
-
-    print(
-        "MAE:",
-        round(mae, 4)
-    )
-
-    print(
-        "RMSE:",
-        round(rmse, 4)
-    )
-
-    print(
-        "R²:",
-        round(r2, 4)
-    )
-
-
-    # --------------------------------------------------------
-    # MLFLOW PARAMETERS
-    # --------------------------------------------------------
-
-    mlflow.log_param(
-        "model_type",
-        "RandomForestRegressor"
-    )
-
-    mlflow.log_param(
-        "n_estimators",
-        N_ESTIMATORS
-    )
-
-    mlflow.log_param(
-        "random_state",
-        RANDOM_STATE
-    )
-
-    mlflow.log_param(
-        "test_size",
-        TEST_SIZE
-    )
-
-    mlflow.log_param(
-        "dataset",
-        "data/agriculture.csv"
-    )
-
-    mlflow.log_param(
-        "dataset_rows",
-        len(df)
-    )
-
-    mlflow.log_param(
-        "dataset_columns",
-        len(df.columns)
-    )
-
-    mlflow.log_param(
-        "features",
-        ",".join(features)
-    )
-
-
-    # --------------------------------------------------------
-    # MLFLOW METRICS
-    # --------------------------------------------------------
-
-    mlflow.log_metric(
-        "MAE",
-        mae
-    )
-
-    mlflow.log_metric(
-        "RMSE",
-        rmse
-    )
-
-    mlflow.log_metric(
-        "R2",
-        r2
-    )
-
-
-    # --------------------------------------------------------
-    # SAVE MODEL TO MLFLOW
-    # --------------------------------------------------------
-
-    mlflow.sklearn.log_model(
-
-        yield_model,
-
-        name="crop_yield_model",
-
-        skops_trusted_types=TRUSTED_TYPES
-    )
-
-
-    # --------------------------------------------------------
-    # ACTUAL VS PREDICTED
-    # --------------------------------------------------------
-
-    print("\n")
-    print("========================================")
-    print("CROP YIELD - ACTUAL VS PREDICTED")
-    print("========================================")
-
-
-    for actual, predicted in zip(
-
-        y_test_yield,
-
-        yield_prediction
-
-    ):
-
-        print(
-
-            "Actual:",
-
-            round(actual, 2),
-
-            "| Predicted:",
-
-            round(predicted, 2)
-        )
+print("Model saved successfully:")
+print(MODEL_PATH)
 
 
 # ============================================================
-# NEW FARM PREDICTION
+# 14. SAMPLE FARM PREDICTION
 # ============================================================
 
-print("\n")
-print("========================================")
-print("NEW FARM PREDICTION")
-print("========================================")
+print("\n" + "=" * 60)
+print("SAMPLE FARM PREDICTION")
+print("=" * 60)
 
-
-new_farm = pd.DataFrame(
-
-    {
-
-        "temperature": [35],
-
-        "humidity": [55],
-
-        "soil_moisture": [38],
-
-        "rainfall": [0],
-
-        "soil_ph": [5.9],
-
-        "nitrogen": [52],
-
-        "phosphorus": [29],
-
-        "potassium": [24]
-
-    }
-
+sample_farm = pd.DataFrame(
+    [
+        {
+            "nitrogen": 90,
+            "phosphorus": 42,
+            "potassium": 43,
+            "temperature": 25,
+            "humidity": 80,
+            "soil_ph": 6.5,
+            "rainfall": 200,
+            "soil_moisture": 70
+        }
+    ]
 )
 
-
-# ============================================================
-# PREDICT IRRIGATION
-# ============================================================
-
-irrigation_result = irrigation_model.predict(
-
-    new_farm
-
+recommended_crop = model.predict(
+    sample_farm
 )[0]
 
+print("\nSample farm data:")
+print(sample_farm.to_string(index=False))
 
-# ============================================================
-# PREDICT SOIL HEALTH
-# ============================================================
-
-soil_result = soil_model.predict(
-
-    new_farm
-
-)[0]
+print("\nRecommended crop:")
+print(recommended_crop)
 
 
 # ============================================================
-# PREDICT CROP YIELD
+# 15. FINAL INFORMATION
 # ============================================================
 
-yield_result = yield_model.predict(
-
-    new_farm
-
-)[0]
-
-
-# ============================================================
-# DISPLAY IRRIGATION
-# ============================================================
-
-if irrigation_result == 1:
-
-    print("Irrigation: REQUIRED")
-
-else:
-
-    print("Irrigation: NOT REQUIRED")
-
-
-# ============================================================
-# DISPLAY SOIL HEALTH
-# ============================================================
-
-if soil_result == 2:
-
-    print("Soil Health: GOOD")
-
-elif soil_result == 1:
-
-    print("Soil Health: MEDIUM")
-
-else:
-
-    print("Soil Health: POOR")
-
-
-# ============================================================
-# DISPLAY CROP YIELD
-# ============================================================
-
-print(
-
-    "Predicted Crop Yield:",
-
-    round(yield_result, 2),
-
-    "tons/hectare"
-
-)
-
-
-# ============================================================
-# FINAL MESSAGE
-# ============================================================
-
-print("\n")
-print("========================================")
+print("\n" + "=" * 60)
 print("TRAINING COMPLETED SUCCESSFULLY")
-print("========================================")
+print("=" * 60)
+
+print("\nDataset:")
+print(DATA_PATH)
+
+print("\nModel:")
+print(MODEL_PATH)
+
+print("\nAccuracy:")
+print(f"{accuracy:.4f}")
 
 print("\nMLflow experiment:")
-print("Smart Agriculture Prediction")
+print(EXPERIMENT_NAME)
 
-print("\nModels logged:")
-print("1. Irrigation Model")
-print("2. Soil Health Model")
-print("3. Crop Yield Model")
+print("\nMLflow server:")
+print(MLFLOW_URI)

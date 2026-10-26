@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load dataset
-df = pd.read_csv("data/agriculture.csv")
+df = pd.read_csv("data/real_agriculture.csv")
 
 print("================================")
 print("SMART AGRICULTURE DATASET")
