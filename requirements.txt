@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pandas
+scikit-learn
+joblib
+mlflow
+dvc
+evidently
+pytest
+httpx
