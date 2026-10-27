@@ -1,0 +1,629 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Smart Agriculture Assistant</title>
+
+<style>
+:root {
+  --green: #176b45;
+  --dark-green: #10472f;
+  --light-green: #edf8ef;
+  --text: #20382b;
+  --muted: #607367;
+  --border: #dce8df;
+  --white: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  background: #f3f7f3;
+  line-height: 1.5;
+}
+
+header {
+  background: linear-gradient(130deg, #10472f, #238252);
+  color: white;
+  text-align: center;
+  padding: 34px 16px;
+}
+
+header .logo {
+  font-size: 42px;
+}
+
+header h1 {
+  margin: 6px 0;
+  font-size: clamp(27px, 4vw, 38px);
+}
+
+header p {
+  margin: 8px 0 0;
+  color: #e3f4e7;
+  font-size: 17px;
+}
+
+main {
+  width: min(1100px, 100%);
+  margin: auto;
+  padding: 22px 16px 40px;
+}
+
+.panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 25px;
+  margin-bottom: 22px;
+  box-shadow: 0 5px 20px #153c2310;
+}
+
+.panel h2 {
+  margin-top: 0;
+  font-size: 25px;
+}
+
+.subtitle {
+  color: var(--muted);
+  margin-top: -8px;
+  margin-bottom: 22px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.field label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 7px;
+}
+
+.field small {
+  display: block;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+input {
+  width: 100%;
+  padding: 13px;
+  font-size: 17px;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid #bdcfc1;
+  border-radius: 9px;
+}
+
+input:focus {
+  outline: 3px solid #c4ead0;
+  border-color: var(--green);
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 3px solid #8dbda0;
+  outline-offset: 3px;
+}
+
+.primary {
+  width: 100%;
+  margin-top: 24px;
+  color: white;
+  background: var(--green);
+}
+
+.primary:hover {
+  background: var(--dark-green);
+}
+
+button:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.result-card {
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 21px;
+  background: #fbfdfb;
+}
+
+.result-card .emoji {
+  font-size: 30px;
+}
+
+.result-card h3 {
+  margin: 8px 0;
+  font-size: 19px;
+}
+
+.result-value {
+  font-size: clamp(23px, 3vw, 30px);
+  font-weight: bold;
+  overflow-wrap: anywhere;
+  margin: 12px 0;
+  color: var(--dark-green);
+}
+
+.result-card p {
+  margin-bottom: 0;
+  color: #52685a;
+}
+
+.crop-card {
+  background: #edf8ef;
+}
+
+.yield-card {
+  background: #eef5ff;
+}
+
+.water-card {
+  background: #fff8e8;
+}
+
+.soil-card {
+  background: #f0f7e9;
+}
+
+.confidence {
+  display: inline-block;
+  font-size: 13px;
+  margin-top: 12px;
+  padding: 5px 9px;
+  background: #ffffffb5;
+  border-radius: 6px;
+  color: #405c49;
+}
+
+.notice {
+  margin-top: 18px;
+  border-radius: 10px;
+  background: #fff6df;
+  border: 1px solid #efdfae;
+  padding: 15px;
+  color: #6e5113;
+}
+
+.error {
+  color: #a32121;
+  background: #fff0f0;
+  border: 1px solid #f0caca;
+  border-radius: 9px;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.secondary {
+  color: var(--dark-green);
+  background: #e7f2e9;
+}
+
+.secondary:hover {
+  background: #d7eadc;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 20px;
+}
+
+@media (max-width: 650px) {
+  .fields,
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  header {
+    padding: 25px 12px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo" aria-hidden="true">🌱</div>
+  <h1>Smart Agriculture Assistant</h1>
+  <p>Simple guidance for healthier crops and better farming</p>
+</header>
+
+<main>
+
+<section class="panel" id="inputPanel">
+  <h2>🌾 Tell Us About Your Farm</h2>
+
+  <p class="subtitle">
+    Enter the measurements below, then press the green button
+    to receive your farm report.
+  </p>
+
+  <form id="farmForm">
+    <div class="fields">
+
+      <div class="field">
+        <label for="nitrogen">🌱 Nitrogen (N)</label>
+        <input id="nitrogen" name="nitrogen" type="number"
+               min="0" max="300" step="any" value="90" required>
+        <small>Enter the nitrogen measurement from your soil test.</small>
+      </div>
+
+      <div class="field">
+        <label for="phosphorus">🪴 Phosphorus (P)</label>
+        <input id="phosphorus" name="phosphorus" type="number"
+               min="0" max="300" step="any" value="42" required>
+        <small>Enter the phosphorus measurement from your soil test.</small>
+      </div>
+
+      <div class="field">
+        <label for="potassium">🌿 Potassium (K)</label>
+        <input id="potassium" name="potassium" type="number"
+               min="0" max="300" step="any" value="43" required>
+        <small>Enter the potassium measurement from your soil test.</small>
+      </div>
+
+      <div class="field">
+        <label for="temperature">☀️ Temperature (°C)</label>
+        <input id="temperature" name="temperature" type="number"
+               min="-10" max="70" step="any" value="25" required>
+        <small>The air temperature in degrees Celsius.</small>
+      </div>
+
+      <div class="field">
+        <label for="humidity">💧 Air Humidity (%)</label>
+        <input id="humidity" name="humidity" type="number"
+               min="0" max="100" step="any" value="80" required>
+        <small>Enter a percentage from 0 to 100.</small>
+      </div>
+
+      <div class="field">
+        <label for="soil_ph">🧪 Soil pH</label>
+        <input id="soil_ph" name="soil_ph" type="number"
+               min="0" max="14" step="any" value="6.5" required>
+        <small>Use the pH value from your soil test.</small>
+      </div>
+
+      <div class="field">
+        <label for="rainfall">🌧️ Rainfall (mm)</label>
+        <input id="rainfall" name="rainfall" type="number"
+               min="0" max="1000" step="any" value="200" required>
+        <small>Use the rainfall measurement for your area.</small>
+      </div>
+
+      <div class="field">
+        <label for="soil_moisture">💦 Soil Moisture (%)</label>
+        <input id="soil_moisture" name="soil_moisture" type="number"
+               min="0" max="100" step="any" value="40" required>
+        <small>Enter the moisture percentage from your sensor.</small>
+      </div>
+
+    </div>
+
+    <button type="submit" class="primary" id="submitButton">
+      🔍 Analyze My Farm
+    </button>
+
+    <p id="errorMessage" class="error" role="alert" hidden></p>
+  </form>
+</section>
+
+
+<section class="panel" id="resultsPanel" hidden>
+  <h2>📋 Your Farm Report</h2>
+
+  <p class="subtitle">
+    Here is what our machine-learning models predict from your inputs.
+  </p>
+
+  <div class="results-grid">
+
+    <article class="result-card crop-card">
+      <div class="emoji" aria-hidden="true">🌱</div>
+      <h3>Which crop should I grow?</h3>
+      <div class="result-value" id="cropResult">—</div>
+      <p id="cropInfo">
+        A crop recommendation based on your farm measurements.
+      </p>
+      <div class="confidence" id="cropConfidence" hidden></div>
+    </article>
+
+    <article class="result-card yield-card">
+      <div class="emoji" aria-hidden="true">🌾</div>
+      <h3>How much crop might I get?</h3>
+      <div class="result-value" id="yieldResult">—</div>
+      <p id="yieldInfo">
+        The predicted yield value and its verified unit.
+      </p>
+    </article>
+
+    <article class="result-card water-card">
+      <div class="emoji" aria-hidden="true">💧</div>
+      <h3>Should I water my field?</h3>
+      <div class="result-value" id="irrigationResult">—</div>
+      <p id="irrigationInfo"></p>
+      <div class="confidence" id="irrigationConfidence" hidden></div>
+    </article>
+
+    <article class="result-card soil-card">
+      <div class="emoji" aria-hidden="true">🌿</div>
+      <h3>Is my soil healthy?</h3>
+      <div class="result-value" id="soilResult">—</div>
+      <p id="soilInfo"></p>
+      <div class="confidence" id="soilConfidence" hidden></div>
+    </article>
+
+  </div>
+
+  <div class="notice" id="notice">
+    These results are predictions. Check actual field conditions before
+    making farming decisions.
+  </div>
+
+  <div class="actions">
+    <button type="button" class="secondary" id="readButton">
+      🔊 Read Results Aloud
+    </button>
+
+    <button type="button" class="secondary" id="stopReadingButton">
+      ⏹ Stop Reading
+    </button>
+
+    <button type="button" class="secondary" id="editButton">
+      ✏️ Change Farm Details
+    </button>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Smart Agriculture Assistant · Machine-learning estimates, not a substitute
+  for a soil test or local agricultural advice.
+</footer>
+
+
+<script>
+const form = document.getElementById("farmForm");
+const submitButton = document.getElementById("submitButton");
+const errorMessage = document.getElementById("errorMessage");
+const resultsPanel = document.getElementById("resultsPanel");
+
+let speechText = "";
+
+function showText(id, value) {
+  document.getElementById(id).textContent =
+    value === null || value === undefined || value === ""
+      ? "Not available"
+      : String(value);
+}
+
+function showConfidence(id, value) {
+  const element = document.getElementById(id);
+
+  if (value === null || value === undefined) {
+    element.hidden = true;
+    element.textContent = "";
+    return;
+  }
+
+  element.textContent = "Model confidence: " + value + "%";
+  element.hidden = false;
+}
+
+form.addEventListener("submit", async function(event) {
+  event.preventDefault();
+
+  errorMessage.hidden = true;
+  errorMessage.textContent = "";
+  resultsPanel.hidden = true;
+
+  submitButton.disabled = true;
+  submitButton.textContent = "⏳ Analyzing your farm...";
+
+  const names = [
+    "nitrogen",
+    "phosphorus",
+    "potassium",
+    "temperature",
+    "humidity",
+    "soil_ph",
+    "rainfall",
+    "soil_moisture"
+  ];
+
+  const farmData = {};
+
+  names.forEach(function(name) {
+    farmData[name] = Number(form.elements[name].value);
+  });
+
+  try {
+    const response = await fetch("/analyze", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(farmData)
+    });
+
+    const output = await response.json();
+
+    if (!response.ok) {
+      const details = output.detail || "The server could not analyze your farm.";
+      throw new Error(
+        typeof details === "string" ? details : JSON.stringify(details)
+      );
+    }
+
+    showText("cropResult", output.crop.name);
+    showText(
+      "cropInfo",
+      "Recommended crop based on the measurements you entered."
+    );
+
+    showConfidence(
+      "cropConfidence",
+      output.crop.confidence_percent
+    );
+
+    showText(
+      "yieldResult",
+      Number(output.yield.value).toFixed(2) + " yield units"
+    );
+
+    showText(
+      "yieldInfo",
+      output.yield.message ||
+      "The yield unit has not been confirmed."
+    );
+
+    showText(
+      "irrigationResult",
+      output.irrigation.status
+    );
+
+    showText(
+      "irrigationInfo",
+      output.irrigation.message
+    );
+
+    showConfidence(
+      "irrigationConfidence",
+      output.irrigation.confidence_percent
+    );
+
+    showText(
+      "soilResult",
+      output.soil_health.status
+    );
+
+    showText(
+      "soilInfo",
+      output.soil_health.message
+    );
+
+    showConfidence(
+      "soilConfidence",
+      output.soil_health.confidence_percent
+    );
+
+    showText(
+      "notice",
+      output.notice ||
+      "Predictions are estimates. Check real field conditions."
+    );
+
+    speechText =
+      "Your farm report. " +
+      "Recommended crop: " + output.crop.name + ". " +
+      "Predicted crop yield: " + output.yield.value +
+      " yield units. " +
+      "Irrigation advice: " + output.irrigation.status + ". " +
+      output.irrigation.message + ". " +
+      "Soil health: " + output.soil_health.status + ". " +
+      output.soil_health.message + ". " +
+      "Please verify the yield unit and check real field conditions.";
+
+    resultsPanel.hidden = false;
+
+    resultsPanel.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+
+  } catch (error) {
+    errorMessage.textContent =
+      "We could not analyze your farm.\n" +
+      error.message +
+      "\n\nCheck that the API server is running, then try again.";
+
+    errorMessage.hidden = false;
+
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "🔍 Analyze My Farm";
+  }
+});
+
+
+document.getElementById("readButton").addEventListener("click", function() {
+  if (!("speechSynthesis" in window)) {
+    alert("Read aloud is not supported by this browser.");
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(speechText);
+  utterance.lang = "en-IN";
+  utterance.rate = 0.9;
+
+  window.speechSynthesis.speak(utterance);
+});
+
+
+document.getElementById("stopReadingButton").addEventListener("click", function() {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+});
+
+
+document.getElementById("editButton").addEventListener("click", function() {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  document.getElementById("inputPanel").scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+});
+</script>
+
+</body>
+</html>
